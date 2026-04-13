@@ -11,6 +11,7 @@ import DigitalTwin from './pages/DigitalTwin';
 import RiskAnalysis from './pages/RiskAnalysis';
 import Portfolio from './pages/Portfolio';
 import Notifications from './pages/Notifications';
+import AiAssistant from './components/AiAssistant'
 
 export default function App() {
   const { user, loading } = useAuth();
@@ -63,6 +64,7 @@ export default function App() {
         {renderPage()}
       </div>
       <Toast />
+    <AiAssistant />
     </div>
   );
 }
