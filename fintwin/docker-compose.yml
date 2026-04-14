@@ -62,7 +62,7 @@ services:
       NOTIFICATION_SERVICE_URL: http://notification-service:8006
       INTERNAL_KEY: fintwin-internal-2024
       PORTFOLIO_SERVICE_URL: http://portfolio-service:8005
-      GEMINI_API_KEY: AIzaSyB25-oI7MWRN0CKk9gQgBf8bZeE6HUbqWI
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       db:
         condition: service_healthy
