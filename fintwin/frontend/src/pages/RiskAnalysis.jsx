@@ -4,12 +4,14 @@ import StatCard from '../components/StatCard';
 import Badge from '../components/Badge';
 import RiskBar from '../components/RiskBar';
 import { showToast } from '../components/Toast';
+import DeepAnalysis from '../components/DeepAnalysis';
 
 export default function RiskAnalysis() {
   const [accounts, setAccounts] = useState([]);
   const [riskScores, setRiskScores] = useState({});
   const [flags, setFlags] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showDeepAnalysis, setShowDeepAnalysis] = useState(false);
 
   const fetchAccounts = async () => {
     try {
@@ -52,7 +54,6 @@ export default function RiskAnalysis() {
           const txnRes = await client.get(`/transactions/account/${acc.id}`);
           txns = txnRes.data;
         } catch { /* no transactions */ }
-
         await client.post('/risk/analyze', {
           account_id: acc.id,
           current_balance: acc.balance,
@@ -78,9 +79,19 @@ export default function RiskAnalysis() {
     <div>
       <div className="page-header">
         <h1 className="page-title">Risk Analysis</h1>
-        <button className="btn btn-blue" onClick={runAnalysis} disabled={loading}>
-          {loading ? 'Analyzing…' : 'Run Analysis'}
-        </button>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            id="deep-analysis-btn"
+            className="btn btn-blue"
+            onClick={() => setShowDeepAnalysis(true)}
+            style={{ background: 'linear-gradient(135deg, #6366f1, #4f46e5)' }}
+          >
+            🧠 Deep Analysis
+          </button>
+          <button className="btn btn-outline" onClick={runAnalysis} disabled={loading}>
+            {loading ? 'Analyzing…' : 'Run Analysis'}
+          </button>
+        </div>
       </div>
 
       <div className="three-col">
@@ -131,6 +142,8 @@ export default function RiskAnalysis() {
           ))}
         </div>
       </div>
+
+      {showDeepAnalysis && <DeepAnalysis onClose={() => setShowDeepAnalysis(false)} />}
     </div>
   );
 }

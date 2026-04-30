@@ -9,7 +9,7 @@ class Account(Base):
     id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
     email = Column(String, unique=True, nullable=False)
-    password = Column(String, nullable=False)
+    picture = Column(String, nullable=True)   # Google profile picture URL
     type = Column(String, default="savings")
     balance = Column(Float, default=0.0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

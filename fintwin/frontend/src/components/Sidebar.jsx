@@ -6,6 +6,7 @@ const navItems = [
   { id: 'dashboard', label: 'Dashboard', icon: '⊞' },
   { id: 'accounts', label: 'Accounts', icon: '⊘' },
   { id: 'transactions', label: 'Transactions', icon: '↕' },
+  { id: 'statements', label: 'Upload Statement', icon: '📄' },
   { id: 'twin', label: 'Digital Twin', icon: '◷' },
   { id: 'risk', label: 'Risk Analysis', icon: '⚠' },
   { id: 'portfolio', label: 'Portfolio', icon: '📈' },
@@ -13,7 +14,7 @@ const navItems = [
 ];
 
 export default function Sidebar({ isOpen, onClose, currentPage, setCurrentPage }) {
-  const { user, logout } = useAuth();
+  const { user, token, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
   const initials = user?.name
@@ -32,9 +33,27 @@ export default function Sidebar({ isOpen, onClose, currentPage, setCurrentPage }
 
   useEffect(() => {
     fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000); // Every 30 seconds
-    return () => clearInterval(interval);
-  }, [user]);
+    
+    if (!token) return;
+
+    const wsUrl = `ws://localhost:8006/notifications/ws/${token}`;
+    const ws = new WebSocket(wsUrl);
+
+    ws.onmessage = (event) => {
+      try {
+        const notif = JSON.parse(event.data);
+        if (!notif.is_read) {
+          setUnreadCount(prev => prev + 1);
+        }
+      } catch (err) {
+        console.error("WS Message Error", err);
+      }
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [user, token]);
 
   const handleNav = (pageId) => {
     setCurrentPage(pageId);

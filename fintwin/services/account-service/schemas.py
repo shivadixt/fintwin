@@ -3,18 +3,11 @@ from typing import Optional
 from datetime import datetime
 
 
-class AccountCreate(BaseModel):
-    name: str
-    email: str
-    password: str
-    type: str = "savings"
-    balance: float = 0.0
-
-
 class AccountOut(BaseModel):
     id: str
     name: str
     email: str
+    picture: Optional[str] = None
     type: str
     balance: float
     created_at: datetime
@@ -23,18 +16,7 @@ class AccountOut(BaseModel):
         from_attributes = True
 
 
-class RegisterRequest(BaseModel):
-    name: str
-    email: str
-    password: str
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-class TokenResponse(BaseModel):
+class SessionResponse(BaseModel):
     token: str
     user: dict
 

@@ -1,123 +1,99 @@
-# FinTwin — Financial Digital Twin System
+# FinTwin AI 🧠💰
+**Your Financial Digital Twin — Powered by Google Gemini 2.0 Flash**
 
-FinTwin is a modern, fully-isolated, multi-tenant financial architecture that allows users to manage their live accounts, track real-time transactions, and run "Digital Twin" simulations against their state without modifying live data.
+FinTwin is a modern, microservices-based financial intelligence platform that helps users take control of their finances through automated bank statement analysis, AI-driven risk scoring, and deep financial projections.
 
-## 🏗️ Architecture
+![FinTwin Banner](https://img.shields.io/badge/AI-Gemini_2.0_Flash-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/Status-Production_Ready-green?style=for-the-badge)
+![Tech](https://img.shields.io/badge/Stack-React_|_FastAPI_|_PostgreSQL-blueviolet?style=for-the-badge)
 
-FinTwin utilizes a robust microservices architecture containerized via **Docker** and orchestrated using **Docker Compose**. All internal traffic is routed through an **Nginx** API Gateway.
+---
 
-### Core Microservices (Backend)
+## 🚀 Key Features
 
-Written in **Python (FastAPI)** and communicating with a single **PostgreSQL** database node (with separate logical models), the backend is broken out into six independent services. It also utilizes **Redis** for high-speed volatile caching:
+### 1. **AI-Powered Deep Analysis**
+*   **Zero-Cost Intelligence:** Fully integrated with **Google Gemini 2.0 Flash API** for high-speed, free-tier financial advice.
+*   **Feasibility Scoring:** Get a "Gauge Score" on large purchases (e.g., "Can I afford an iPhone?").
+*   **Projections:** Visual charts showing your future balance based on current spending habits.
 
-1. **Account Service (`:8001`)**
-   - Handles user registration, JWT generation, secure credential hashing, and basic balances.
-   - Includes cross-service internal "status/existence" endpoints.
+### 2. **Smart Bank Statement Parsing**
+*   **Multi-Format Support:** Robust extraction from both **PDF** and **CSV** statements.
+*   **Fuzzy Logic Engine:** Automatically recognizes headers from major banks like SBI, HDFC, ICICI, and Axis.
+*   **Aggressive Text Extraction:** Can "read" transactions even from PDFs without clear table structures.
 
-2. **Transaction Service (`:8002`)**
-   - Logs deposits, withdrawals, and inter-user transfers.
-   - Manages strict database `WHERE` filtering ensuring users can only interact with money they own.
+### 3. **Secure Infrastructure**
+*   **Google OAuth 2.0:** Secure login using your Google account (no passwords stored).
+*   **Redis Sessions:** High-performance, server-side session management.
+*   **Nginx Gateway:** Centralized routing and SSL termination.
 
-3. **Twin Service (`:8003`)**
-   - The Digital Twin engine. Allows running hypothetical scenarios (e.g. rate changes, massive withdrawals) on duplicate temporary states to assess projected risk.
+---
 
-4. **Risk Service (`:8004`)**
-   - Analyzes real-time metrics including live balance, transaction velocity, and anomaly detection to continuously generate a "Risk Score".
-   - Generates user-specific UI notifications on the primary dashboard.
+## 🛠 Tech Stack
 
-5. **Portfolio Service (`:8005`)**
-   - Aggregates user account and transaction data to present a holistic view of the user's wealth.
-   - Implements robust pagination and optimizations for frontend display.
+*   **Frontend:** React.js, Vite, Vanilla CSS (Premium Glassmorphism Design)
+*   **Backend:** Python (FastAPI), SQLAlchemy
+*   **Database:** PostgreSQL (Primary Store), Redis (Session Cache)
+*   **AI Engine:** Google Generative AI (Gemini 2.0)
+*   **DevOps:** Docker, Docker Compose, Nginx
 
-6. **Notification Service (`:8006`)**
-   - Dedicated service for managing system and user-specific alerts.
-   - Integrates across services to keep users informed natively.
-### Frontend
+---
 
-- **Framework**: React 18
-- **Build Tool**: Vite
-- **Styling**: Context-aware custom Vanilla CSS (dark/light themes).
-- **HTTP Client**: Axios
+## ⚙️ Setup & Installation
 
-## 🛡️ Security & Multi-Tenancy
+### 1. Prerequisites
+*   [Docker Desktop](https://www.docker.com/products/docker-desktop/) installed and running.
+*   Google Cloud Console credentials (Client ID & Secret).
+*   Google AI Studio API Key (Gemini).
 
-FinTwin adheres to a strict Zero-Trust philosophy. Data leakage between users is mathematically prevented natively at the backend query layer.
+### 2. Environment Configuration
+Create a `.env` file in the root directory:
 
-- **JWT Authorization**: All endpoints demand a cryptographically signed JWT via the `Authorization: Bearer <token>` header.
-- **Intrinsic Identity Lock**: Identity is extracted securely via `jwt.decode(token).get("sub")`. Client payloads requesting specific `account_id` operations are ignored if they do not match the JWT inherently validating the sender.
-- **Server-to-Server Auth Proxy**: Microservices needing data from sister services (e.g. Risk needing Account Balances) securely proxy the original user's JWT so credentials aren't bypassed in intra-container traffic.
+```env
+# AI Keys
+GEMINI_API_KEY=your_google_gemini_key
 
-## 📦 Dependencies
+# Google OAuth
+GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your_client_secret
 
-### Backend Packages (Python 3.11+)
-
-- `fastapi` (API Framework)
-- `uvicorn` (ASGI Server)
-- `sqlalchemy` (ORM)
-- `psycopg2-binary` (Postgres driver)
-- `passlib[bcrypt]` (Password hashing)
-- `python-jose[cryptography]` (JWT Generation & Decoding)
-- `httpx` (Internal Server-to-Server HTTP Client)
-- `pydantic` (Data Validation)
-- `redis` (In-memory caching client)
-
-### Frontend Packages (Node.js)
-
-- `react` / `react-dom` (^18.2.0)
-- `vite` (^5.0.8)
-- `axios` (^1.6.2)
-
-### Infrastructure Layer
-
-- `docker` & `docker-compose`
-- `nginx:latest`
-- `postgres:15`
-- `redis:alpine`
-## 🚀 Setup & Execution
-
-### Prerequisites
-
-- Docker Engine & Docker Compose installed natively.
-
-### Running Locally
-
-To completely build, compile, and execute the multi-container stack, run the following from the root directory:
-
-```bash
-docker compose up -d --build
+# Internal Communication
+INTERNAL_KEY=fintwin-internal-2024
 ```
 
-### Access Points
+### 3. Spin up the containers
+```bash
+docker-compose up -d --build
+```
+The application will be available at `http://localhost:3000`.
 
-1. **Frontend App**: [http://localhost:3000](http://localhost:3000) (if proxied via your local Dev server) or mapped automatically by Nginx via `http://localhost:80`.
-2. **PostgreSQL DB**: Mapped to `localhost:5432`.
-   - User: `postgres`
-   - Password: `postgres`
-   - DB Name: `fintwin`
+---
 
-## 📝 Key Endpoints Profile (Post-Security Upgrade)
+## 🏗 Microservices Architecture
 
-### Auth (`auth.py`)
+| Service | Port | Responsibility |
+| :--- | :--- | :--- |
+| **Nginx** | 80 | API Gateway & Frontend Server |
+| **Frontend** | 3000 | User Dashboard & UI |
+| **Account Service** | 8001 | User Profiles & OAuth Flow |
+| **Transaction Service** | 8002 | Bank Parsing & DB Management |
+| **Risk Service** | 8003 | Gemini AI Integration & Projections |
+| **Notification Service** | 8004 | System Alerts & Background Tasks |
 
-- `POST /auth/register` (Public)
-- `POST /auth/login` (Public, returns `ft_token`)
+---
 
-### Account Operations
+## 📊 Usage Guide
 
-- `GET /accounts/` (Strict: filters `id == current_user.id`)
-- `GET /accounts/{id}` (Strict: 403 if `id != current_user.id`)
+1.  **Login:** Use the "Sign in with Google" button.
+2.  **Upload:** Go to "Upload Statement" and drag your bank PDF/CSV.
+3.  **Analyze:** Visit "Risk Analysis" and click **Deep Analysis** to ask the AI about your financial goals.
+4.  **History:** View your spending patterns in the transaction history list.
 
-### Transactions
+---
 
-- `GET /transactions/` (Aggregates where `account_id` OR `to_account` align with user)
-- `POST /transactions/` (Forces sender to match logged-in user, triggers Transfer validations safely)
+## 🛡 Security Note
+FinTwin utilizes an **Internal API Key** (`INTERNAL_KEY`) to ensure that microservices can only talk to each other and not to unauthorized external requests.
 
-### Risk & Status
+---
 
-- `GET /risk/notifications/{id}` (Generates smart alerts evaluating cross-service user data)
-- `POST /simulate` (Safely spins up Twin metrics analyzing virtual balance projections)
-
-### Portfolio & Notification
-
-- `GET /portfolio/` (Aggregates accounts and balances securely to summarize wealth)
-- `GET /notifications/` (Retrieves user-specific system alerts contextually)
+## 📜 License
+© 2024 FinTwin Project. Developed for Advanced Financial Analytics.

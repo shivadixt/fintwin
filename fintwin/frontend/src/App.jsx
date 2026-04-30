@@ -11,7 +11,9 @@ import DigitalTwin from './pages/DigitalTwin';
 import RiskAnalysis from './pages/RiskAnalysis';
 import Portfolio from './pages/Portfolio';
 import Notifications from './pages/Notifications';
+import StatementUpload from './pages/StatementUpload';
 import AIAssistant from './components/AIAssistant';
+
 export default function App() {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -43,6 +45,7 @@ export default function App() {
       case 'risk': return <RiskAnalysis />;
       case 'portfolio': return <Portfolio />;
       case 'notifications': return <Notifications />;
+      case 'statements': return <StatementUpload />;
       default: return <Dashboard />;
     }
   };

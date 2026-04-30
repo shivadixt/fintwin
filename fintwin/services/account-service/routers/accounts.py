@@ -1,41 +1,43 @@
 import os
 import json
 import redis
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
+from typing import Optional
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
-from jose import jwt, JWTError
 
 from database import get_db
 from models import Account
-from schemas import AccountCreate, AccountOut, BalanceUpdate
-from routers.auth import generate_account_id, pwd_context
+from schemas import AccountOut, BalanceUpdate
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
-JWT_SECRET = os.getenv("JWT_SECRET", "fintwin-super-secret-key-2024")
-JWT_ALGORITHM = "HS256"
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
-
 # Redis connection
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
+INTERNAL_KEY = os.getenv("INTERNAL_KEY", "fintwin-internal-2024")
+
 try:
     r = redis.from_url(REDIS_URL, decode_responses=True)
+    r.ping()
 except Exception:
     r = None
 
 CACHE_TTL = 30  # 30 seconds
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/google", auto_error=False)
+
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        account_id = payload.get("sub")
-        if account_id is None:
-            raise HTTPException(status_code=401, detail="Invalid token")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
+    """Validate session token against Redis and return the Account object."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    if not r:
+        raise HTTPException(status_code=503, detail="Auth service unavailable")
+    session_data = r.get(f"session:{token}")
+    if not session_data:
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+    parts = session_data.split("|")
+    account_id = parts[0]
     account = db.query(Account).filter(Account.id == account_id).first()
     if account is None:
         raise HTTPException(status_code=401, detail="User not found")
@@ -47,35 +49,12 @@ def list_accounts(db: Session = Depends(get_db), current_user: Account = Depends
     return db.query(Account).filter(Account.id == current_user.id).all()
 
 
-@router.post("/", response_model=AccountOut)
-def create_account(req: AccountCreate, db: Session = Depends(get_db), current_user: Account = Depends(get_current_user)):
-    existing = db.query(Account).filter(Account.email == req.email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    account_id = generate_account_id()
-    hashed = pwd_context.hash(req.password)
-    account = Account(
-        id=account_id,
-        name=req.name,
-        email=req.email,
-        password=hashed,
-        type=req.type,
-        balance=req.balance,
-    )
-    db.add(account)
-    db.commit()
-    db.refresh(account)
-    return account
-
-
 @router.get("/{account_id}/exists")
 def check_account_exists(account_id: str, db: Session = Depends(get_db)):
     account = db.query(Account).filter(Account.id == account_id).first()
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
     return {"exists": True}
-
 
 
 @router.get("/{account_id}", response_model=AccountOut)
@@ -101,6 +80,7 @@ def get_account(account_id: str, db: Session = Depends(get_db), current_user: Ac
         "id": account.id,
         "name": account.name,
         "email": account.email,
+        "picture": account.picture,
         "type": account.type,
         "balance": account.balance,
         "created_at": account.created_at.isoformat() if account.created_at else None,
@@ -133,3 +113,39 @@ def update_balance(account_id: str, req: BalanceUpdate, db: Session = Depends(ge
         pass
 
     return {"id": account.id, "balance": account.balance}
+
+
+@router.get("/internal/accounts/{account_id}", response_model=AccountOut)
+def get_account_internal(account_id: str, x_internal_key: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not x_internal_key or x_internal_key != INTERNAL_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing internal key")
+    account = db.query(Account).filter(Account.id == account_id).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    return {
+        "id": account.id,
+        "name": account.name,
+        "email": account.email,
+        "picture": account.picture,
+        "type": account.type,
+        "balance": account.balance,
+        "created_at": account.created_at.isoformat() if account.created_at else None,
+    }
+
+
+@router.get("/internal/accounts/by-email", response_model=AccountOut)
+def get_account_by_email(email: str, x_internal_key: Optional[str] = Header(None), db: Session = Depends(get_db)):
+    if not x_internal_key or x_internal_key != INTERNAL_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing internal key")
+    account = db.query(Account).filter(Account.email == email).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found for email")
+    return {
+        "id": account.id,
+        "name": account.name,
+        "email": account.email,
+        "picture": account.picture,
+        "type": account.type,
+        "balance": account.balance,
+        "created_at": account.created_at.isoformat() if account.created_at else None,
+    }

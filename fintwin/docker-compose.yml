@@ -28,9 +28,13 @@ services:
       - "8001:8001"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fintwin
-      JWT_SECRET: fintwin-super-secret-key-2024
       ACCOUNT_SERVICE_URL: http://account-service:8001
       REDIS_URL: redis://redis:6379
+      INTERNAL_KEY: ${INTERNAL_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: http://localhost/api/auth/google/callback
+      SESSION_TTL: 86400
     depends_on:
       db:
         condition: service_healthy
@@ -43,10 +47,10 @@ services:
       - "8002:8002"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fintwin
-      JWT_SECRET: fintwin-super-secret-key-2024
       ACCOUNT_SERVICE_URL: http://account-service:8001
       NOTIFICATION_SERVICE_URL: http://notification-service:8006
-      INTERNAL_KEY: fintwin-internal-2024
+      INTERNAL_KEY: ${INTERNAL_KEY}
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
         condition: service_healthy
@@ -57,12 +61,12 @@ services:
       - "8003:8003"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fintwin
-      JWT_SECRET: fintwin-super-secret-key-2024
       ACCOUNT_SERVICE_URL: http://account-service:8001
       NOTIFICATION_SERVICE_URL: http://notification-service:8006
-      INTERNAL_KEY: fintwin-internal-2024
+      INTERNAL_KEY: ${INTERNAL_KEY}
       PORTFOLIO_SERVICE_URL: http://portfolio-service:8005
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
         condition: service_healthy
@@ -73,10 +77,12 @@ services:
       - "8004:8004"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fintwin
-      JWT_SECRET: fintwin-super-secret-key-2024
       ACCOUNT_SERVICE_URL: http://account-service:8001
+      TRANSACTION_SERVICE_URL: http://transaction-service:8002
       NOTIFICATION_SERVICE_URL: http://notification-service:8006
-      INTERNAL_KEY: fintwin-internal-2024
+      INTERNAL_KEY: ${INTERNAL_KEY}
+      REDIS_URL: redis://redis:6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       db:
         condition: service_healthy
@@ -87,8 +93,8 @@ services:
       - "8005:8005"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fintwin
-      JWT_SECRET: fintwin-super-secret-key-2024
-      INTERNAL_KEY: fintwin-internal-2024
+      INTERNAL_KEY: ${INTERNAL_KEY}
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
         condition: service_healthy
@@ -99,8 +105,8 @@ services:
       - "8006:8006"
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/fintwin
-      JWT_SECRET: fintwin-super-secret-key-2024
-      INTERNAL_KEY: fintwin-internal-2024
+      INTERNAL_KEY: ${INTERNAL_KEY}
+      REDIS_URL: redis://redis:6379
     depends_on:
       db:
         condition: service_healthy

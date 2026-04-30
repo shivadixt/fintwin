@@ -49,11 +49,9 @@ def generate_financial_advice(message: str, current_balance: float, portfolio_su
             
     except httpx.HTTPStatusError as e:
         err_data = e.response.json()
-        print(f"Gemini API HTTP Error: {err_data}")
         # Specifically catch Quota errors
         if e.response.status_code == 429:
             return "I'm sorry, but my API key has run out of Google Free Tier quota. I can't think right now!"
         return "I'm having trouble connecting to my AI brain right now (API HTTP Error: " + str(e.response.status_code) + "). Please try again later!"
     except Exception as e:
-        print(f"Gemini API Gen Error: {e}")
         return "I'm having trouble connecting to my AI brain right now. Please try again later!"
