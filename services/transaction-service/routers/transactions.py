@@ -12,7 +12,6 @@ from schemas import TransactionCreate, TransactionOut
 
 router = APIRouter(prefix="/transactions", tags=["transactions"])
 
-ACCOUNT_SERVICE_URL = os.getenv("ACCOUNT_SERVICE_URL", "http://account-service:8001")
 NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8006")
 INTERNAL_KEY = os.getenv("INTERNAL_KEY", "fintwin-internal-2024")
 
@@ -54,20 +53,11 @@ async def send_notification(account_id: str, title: str, message: str, notif_typ
 
 @router.post("/", response_model=TransactionOut)
 async def create_transaction(req: TransactionCreate, db: Session = Depends(get_db), current_user_id: str = Depends(get_current_user)):
-    # Force account_id to current user for deposit/withdrawal
-    if req.type in ("deposit", "withdrawal"):
-        account_id = current_user_id
-    elif req.type == "transfer":
-        account_id = current_user_id
+    account_id = current_user_id
+
+    if req.type == "transfer":
         if not req.to_account:
             raise HTTPException(status_code=400, detail="to_account is required for transfers")
-        # Validate destination account exists
-        async with httpx.AsyncClient() as check_client:
-            check_resp = await check_client.get(f"{ACCOUNT_SERVICE_URL}/accounts/{req.to_account}/exists")
-            if check_resp.status_code != 200:
-                raise HTTPException(status_code=404, detail="Destination account not found")
-    else:
-        account_id = current_user_id
 
     txn = Transaction(
         id=str(uuid.uuid4()),
@@ -80,35 +70,6 @@ async def create_transaction(req: TransactionCreate, db: Session = Depends(get_d
     db.add(txn)
     db.commit()
     db.refresh(txn)
-
-    async with httpx.AsyncClient() as client:
-        if req.type == "deposit":
-            resp = await client.put(
-                f"{ACCOUNT_SERVICE_URL}/accounts/{account_id}/balance",
-                json={"delta": req.amount},
-            )
-            if resp.status_code != 200:
-                raise HTTPException(status_code=500, detail="Failed to update account balance")
-
-        elif req.type == "withdrawal":
-            resp = await client.put(
-                f"{ACCOUNT_SERVICE_URL}/accounts/{account_id}/balance",
-                json={"delta": -req.amount},
-            )
-            if resp.status_code != 200:
-                raise HTTPException(status_code=500, detail="Failed to update account balance")
-
-        elif req.type == "transfer":
-            resp1 = await client.put(
-                f"{ACCOUNT_SERVICE_URL}/accounts/{account_id}/balance",
-                json={"delta": -req.amount},
-            )
-            resp2 = await client.put(
-                f"{ACCOUNT_SERVICE_URL}/accounts/{req.to_account}/balance",
-                json={"delta": req.amount},
-            )
-            if resp1.status_code != 200 or resp2.status_code != 200:
-                raise HTTPException(status_code=500, detail="Failed to update account balances")
 
     # Send notification after successful transaction
     if req.type == "deposit":

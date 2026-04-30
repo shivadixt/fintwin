@@ -8,11 +8,17 @@ ABOUT FINTWIN:
 FinTwin is a microservices-based financial platform that creates a "digital twin" — a virtual copy of your real financial state. You can simulate what-if scenarios (like "what happens if I withdraw ₹80,000?") without touching real data.
 
 THE SERVICES:
-- Account Service: manages user accounts and balances
+- Auth Service: manages Google OAuth login, user profiles, onboarding, and persona scoring
 - Transaction Service: handles deposits, withdrawals, and transfers
 - Digital Twin Engine: runs financial simulations on a virtual copy of your data
 - Risk Analysis Service: scores your account 0-100 based on activity patterns
+- Portfolio Service: manages investment portfolio tracking
 - Notification Service: alerts you when risk thresholds are exceeded
+
+AUTHENTICATION:
+- Users sign in with Google OAuth
+- After first login, users complete an onboarding flow with personal and financial details
+- A Financial Persona Score is computed based on income, goals, and risk appetite
 
 TRANSACTIONS:
 - Deposit: adds money to your account, balance increases
@@ -27,12 +33,15 @@ RISK SCORES (0-100):
 Risk goes up when: a single transaction exceeds 50% of your balance (+20 pts), 3+ transactions in 60 minutes (+15 pts), balance below ₹50,000 (+10 pts), negative balance/overdraft (+25 pts).
 
 DIGITAL TWIN / SIMULATION:
-The simulate feature lets you test scenarios without touching real data. Example: "What if I withdraw ₹80,000?" — the Twin Engine fetches your real balance, creates a virtual copy in memory, applies the withdrawal math, calculates the resulting risk score, and returns the outcome. Your real account is untouched.
+The simulate feature lets you test scenarios without touching real data. Example: "What if I withdraw ₹80,000?" — the Twin Engine takes your entered balance, creates a virtual copy in memory, applies the withdrawal math, calculates the resulting risk score, and returns the outcome.
+
+FINANCIAL PERSONA:
+After onboarding, users get a Financial Persona Score (0-100) and a label like "Conservative Saver", "Aggressive Investor", "Balanced Builder", etc. based on their income, goals, and risk appetite. Three personalized financial tips are also provided.
 
 HOW TO USE THE APP:
-- Login with your email and password to get a JWT token
-- Dashboard shows your total balance, recent transactions, and current risk score
-- Accounts page: view and manage your accounts
+- Sign in with Google to get started
+- Complete onboarding with your financial profile
+- Dashboard shows your persona score, recent transactions, and risk status
 - Transactions page: post deposits, withdrawals, transfers
 - Digital Twin page: run what-if simulations
 - Risk Analysis page: see your full risk breakdown and flags
@@ -40,7 +49,7 @@ HOW TO USE THE APP:
 TECHNICAL (for curious users):
 - Built with FastAPI (Python) backend, React frontend, PostgreSQL database
 - Services communicate via REST APIs through an Nginx gateway
-- Authentication uses JWT tokens (expire after session ends)
+- Authentication uses Google OAuth + internal JWT tokens
 - Docker containers run all services together
 
 RULES:

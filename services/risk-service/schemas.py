@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import datetime
 
 
@@ -15,4 +15,5 @@ class RiskScoreOut(BaseModel):
     score: int
     alert_level: str
     flags: List[str]
+    ml_details: Optional[Dict[str, Any]] = None
     updated_at: datetime

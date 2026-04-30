@@ -1,26 +1,32 @@
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
-export default function Topbar({ onToggleSidebar, currentPage }) {
+export default function Topbar({ onToggleSidebar }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
-  const initials = user?.name
-    ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+  const initials = user?.full_name
+    ? user.full_name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+    : user?.account_name
+    ? user.account_name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
     : '??';
+
+  const displayName = user?.full_name || user?.account_name || 'User';
 
   const toggleTheme = () => {
     const current = document.documentElement.getAttribute('data-theme');
     if (current === 'dark') {
       document.documentElement.removeAttribute('data-theme');
-      sessionStorage.setItem('ft_theme', 'light');
+      localStorage.setItem('ft_theme', 'light');
     } else {
       document.documentElement.setAttribute('data-theme', 'dark');
-      sessionStorage.setItem('ft_theme', 'dark');
+      localStorage.setItem('ft_theme', 'dark');
     }
   };
 
   // Restore theme on mount
   if (typeof window !== 'undefined') {
-    const saved = sessionStorage.getItem('ft_theme');
+    const saved = localStorage.getItem('ft_theme');
     if (saved === 'dark') {
       document.documentElement.setAttribute('data-theme', 'dark');
     }
@@ -41,7 +47,7 @@ export default function Topbar({ onToggleSidebar, currentPage }) {
         </button>
       </div>
 
-      <div className="topbar-center">
+      <div className="topbar-center" onClick={() => navigate('/dashboard')} style={{ cursor: 'pointer' }}>
         <div className="topbar-logo" />
         <span className="topbar-title">FinTwin</span>
       </div>
@@ -60,8 +66,12 @@ export default function Topbar({ onToggleSidebar, currentPage }) {
           )}
         </button>
         <div className="user-pill">
-          <div className="avatar avatar-sm">{initials}</div>
-          <span className="user-name">{user?.name || 'User'}</span>
+          {user?.picture ? (
+            <img src={user.picture} alt="" style={{ width: 28, height: 28, borderRadius: '50%' }} referrerPolicy="no-referrer" />
+          ) : (
+            <div className="avatar avatar-sm">{initials}</div>
+          )}
+          <span className="user-name">{displayName}</span>
         </div>
       </div>
     </div>

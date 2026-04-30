@@ -1,123 +1,233 @@
 # FinTwin — Financial Digital Twin System
 
-FinTwin is a modern, fully-isolated, multi-tenant financial architecture that allows users to manage their live accounts, track real-time transactions, and run "Digital Twin" simulations against their state without modifying live data.
+FinTwin is a modern, fully-isolated, multi-tenant financial architecture that allows users to manage their finances, track real-time transactions, run "Digital Twin" simulations, and receive AI-driven financial persona insights — all without touching live data during what-if analysis.
 
 ## 🏗️ Architecture
 
 FinTwin utilizes a robust microservices architecture containerized via **Docker** and orchestrated using **Docker Compose**. All internal traffic is routed through an **Nginx** API Gateway.
 
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Frontend (React 18 + Vite)            │
+│              localhost:3000 → Nginx :80 proxy            │
+└───────────────────────────┬─────────────────────────────┘
+                            │
+                    ┌───────┴───────┐
+                    │  Nginx :80    │
+                    │  API Gateway  │
+                    └───────┬───────┘
+                            │
+          ┌─────────┬───────┼───────┬──────────┬──────────┐
+          │         │       │       │          │          │
+     Auth :8007  Txn :8002 Twin  Risk :8004  Portfolio  Notif
+                         :8003              :8005     :8006
+          │         │       │       │          │          │
+          └─────────┴───────┼───────┴──────────┴──────────┘
+                            │
+                  ┌─────────┴─────────┐
+                  │  PostgreSQL :5432  │
+                  │  Redis :6379      │
+                  └───────────────────┘
+```
+
 ### Core Microservices (Backend)
 
-Written in **Python (FastAPI)** and communicating with a single **PostgreSQL** database node (with separate logical models), the backend is broken out into six independent services. It also utilizes **Redis** for high-speed volatile caching:
+Written in **Python (FastAPI)** and communicating with a single **PostgreSQL** database (with separate logical models), the backend is broken into six independent services with **Redis** for caching:
 
-1. **Account Service (`:8001`)**
-   - Handles user registration, JWT generation, secure credential hashing, and basic balances.
-   - Includes cross-service internal "status/existence" endpoints.
+1. **Auth Service (`:8007`)** — *NEW: Replaces old Account Service*
+   - Google OAuth 2.0 login via ID token verification
+   - User profile management and onboarding flow
+   - JWT (`ft_token`) generation using HS256
+   - Financial Persona Score computation (12 persona types based on goals + risk)
+   - Endpoints: `/auth/google`, `/auth/me`, `/auth/profile`, `/auth/persona-score`
 
 2. **Transaction Service (`:8002`)**
-   - Logs deposits, withdrawals, and inter-user transfers.
-   - Manages strict database `WHERE` filtering ensuring users can only interact with money they own.
+   - Logs deposits, withdrawals, and inter-user transfers
+   - Strict `WHERE` filtering ensures users only interact with their own money
+   - Supports pagination with `limit`/`offset` parameters
 
 3. **Twin Service (`:8003`)**
-   - The Digital Twin engine. Allows running hypothetical scenarios (e.g. rate changes, massive withdrawals) on duplicate temporary states to assess projected risk.
+   - The Digital Twin engine — run hypothetical scenarios (rate changes, withdrawals) on virtual copies of your balance
+   - Simulation history with save/delete/clear operations
+   - No live data is modified during simulations
 
 4. **Risk Service (`:8004`)**
-   - Analyzes real-time metrics including live balance, transaction velocity, and anomaly detection to continuously generate a "Risk Score".
-   - Generates user-specific UI notifications on the primary dashboard.
+   - Real-time risk scoring (0-100) based on balance, transaction velocity, and anomaly detection
+   - Generates user-specific notifications on the dashboard
+   - Cross-service data aggregation for comprehensive risk assessment
 
 5. **Portfolio Service (`:8005`)**
-   - Aggregates user account and transaction data to present a holistic view of the user's wealth.
-   - Implements robust pagination and optimizations for frontend display.
+   - Aggregates user transaction data to present a holistic wealth view
+   - Implements pagination and optimizations for frontend display
 
 6. **Notification Service (`:8006`)**
-   - Dedicated service for managing system and user-specific alerts.
-   - Integrates across services to keep users informed natively.
+   - Manages system and user-specific alerts
+   - Integrates across services to keep users informed
+
 ### Frontend
 
-- **Framework**: React 18
+- **Framework**: React 18 with React Router DOM
 - **Build Tool**: Vite
-- **Styling**: Context-aware custom Vanilla CSS (dark/light themes).
-- **HTTP Client**: Axios
+- **Styling**: Context-aware custom Vanilla CSS (dark/light themes)
+- **HTTP Client**: Axios with JWT interceptors
+- **Auth**: `@react-oauth/google` for Google Sign-In
+- **AI Assistant**: Built-in FinBot powered by Gemini API
+
+### Pages
+
+| Page | Route | Description |
+|------|-------|-------------|
+| Login | `/login` | Google OAuth sign-in with animated UI |
+| Onboarding | `/onboarding` | 2-step setup: personal info + initial deposit |
+| Dashboard | `/dashboard` | Persona score, account info, stats, transactions |
+| Transactions | `/transactions` | Create deposits/withdrawals/transfers, view history |
+| Digital Twin | `/twin` | Run what-if financial simulations |
+| Risk Analysis | `/risk` | View risk score, flags, and run analysis |
+| Portfolio | `/portfolio` | Holistic wealth overview |
+| Notifications | `/notifications` | System alerts and activity feed |
 
 ## 🛡️ Security & Multi-Tenancy
 
-FinTwin adheres to a strict Zero-Trust philosophy. Data leakage between users is mathematically prevented natively at the backend query layer.
+FinTwin adheres to a strict Zero-Trust philosophy. Data leakage between users is prevented at the backend query layer.
 
-- **JWT Authorization**: All endpoints demand a cryptographically signed JWT via the `Authorization: Bearer <token>` header.
-- **Intrinsic Identity Lock**: Identity is extracted securely via `jwt.decode(token).get("sub")`. Client payloads requesting specific `account_id` operations are ignored if they do not match the JWT inherently validating the sender.
-- **Server-to-Server Auth Proxy**: Microservices needing data from sister services (e.g. Risk needing Account Balances) securely proxy the original user's JWT so credentials aren't bypassed in intra-container traffic.
+- **Google OAuth 2.0**: Users authenticate via Google — no passwords stored
+- **JWT Authorization**: All endpoints require a signed `ft_token` via `Authorization: Bearer <token>` header
+- **Identity Lock**: User ID is extracted from JWT (`jwt.decode(token).get("sub")`), client payloads cannot spoof identity
+- **Protected Routes**: Frontend enforces authentication + profile completion before granting dashboard access
+- **Clock Skew Tolerance**: Token verification allows 30s clock drift for Docker compatibility
 
 ## 📦 Dependencies
 
 ### Backend Packages (Python 3.11+)
 
-- `fastapi` (API Framework)
-- `uvicorn` (ASGI Server)
-- `sqlalchemy` (ORM)
-- `psycopg2-binary` (Postgres driver)
-- `passlib[bcrypt]` (Password hashing)
-- `python-jose[cryptography]` (JWT Generation & Decoding)
-- `httpx` (Internal Server-to-Server HTTP Client)
-- `pydantic` (Data Validation)
-- `redis` (In-memory caching client)
+- `fastapi` — API Framework
+- `uvicorn` — ASGI Server
+- `sqlalchemy` — ORM
+- `psycopg2-binary` — Postgres driver
+- `google-auth` / `google-auth-oauthlib` — Google OAuth verification
+- `python-jose[cryptography]` — JWT generation & decoding
+- `httpx` — Internal server-to-server HTTP client
+- `pydantic` — Data validation
+- `redis` — In-memory caching client
 
 ### Frontend Packages (Node.js)
 
 - `react` / `react-dom` (^18.2.0)
+- `react-router-dom` — URL-based routing with protected routes
+- `@react-oauth/google` — Google Sign-In integration
 - `vite` (^5.0.8)
 - `axios` (^1.6.2)
 
-### Infrastructure Layer
+### Infrastructure
 
 - `docker` & `docker-compose`
 - `nginx:latest`
 - `postgres:15`
-- `redis:alpine`
+- `redis:7-alpine`
+
 ## 🚀 Setup & Execution
 
 ### Prerequisites
 
-- Docker Engine & Docker Compose installed natively.
+- Docker Engine & Docker Compose installed
+- A Google Cloud OAuth 2.0 Client ID ([create one here](https://console.cloud.google.com/apis/credentials))
+
+### Environment Setup
+
+Create a `.env` file in the project root:
+
+```env
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=postgres
+POSTGRES_DB=fintwin
+DATABASE_URL=postgresql://postgres:postgres@db:5432/fintwin
+JWT_SECRET=your-jwt-secret-here
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+VITE_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+```
+
+### Google OAuth Setup
+
+1. Go to [Google Cloud Console → APIs & Services → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create an **OAuth 2.0 Client ID** (Web application)
+3. Add **Authorized JavaScript origins**: `http://localhost:3000`, `http://localhost`
+4. Add **Authorized redirect URIs**: `http://localhost:3000`
+5. Copy the Client ID to `GOOGLE_CLIENT_ID` and `VITE_GOOGLE_CLIENT_ID` in `.env`
+6. Set up **OAuth consent screen** → add your email as a test user
 
 ### Running Locally
 
-To completely build, compile, and execute the multi-container stack, run the following from the root directory:
-
 ```bash
+# Start all backend services
 docker compose up -d --build
+
+# Start frontend dev server
+cd frontend
+npm install
+npm run dev
 ```
 
 ### Access Points
 
-1. **Frontend App**: [http://localhost:3000](http://localhost:3000) (if proxied via your local Dev server) or mapped automatically by Nginx via `http://localhost:80`.
-2. **PostgreSQL DB**: Mapped to `localhost:5432`.
-   - User: `postgres`
-   - Password: `postgres`
-   - DB Name: `fintwin`
+| Service | URL |
+|---------|-----|
+| Frontend App | [http://localhost:3000](http://localhost:3000) |
+| Nginx Gateway | [http://localhost:80](http://localhost:80) |
+| PostgreSQL | `localhost:5432` (user: `postgres`, pass: `postgres`) |
+| Redis | `localhost:6379` |
 
-## 📝 Key Endpoints Profile (Post-Security Upgrade)
+## 📝 API Endpoints
 
-### Auth (`auth.py`)
+### Auth (`/api/auth/`)
 
-- `POST /auth/register` (Public)
-- `POST /auth/login` (Public, returns `ft_token`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/auth/google` | Public | Verify Google ID token, create/fetch user, return `ft_token` |
+| `GET` | `/auth/me` | JWT | Get current user profile |
+| `PUT` | `/auth/profile` | JWT | Save onboarding profile data |
+| `GET` | `/auth/profile/complete` | JWT | Check if profile is complete |
+| `GET` | `/auth/persona-score` | JWT | Get Financial Persona Score + tips |
 
-### Account Operations
+### Transactions (`/api/transactions/`)
 
-- `GET /accounts/` (Strict: filters `id == current_user.id`)
-- `GET /accounts/{id}` (Strict: 403 if `id != current_user.id`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/transactions/` | JWT | Create deposit, withdrawal, or transfer |
+| `GET` | `/transactions/` | JWT | List user's transactions (paginated) |
+| `GET` | `/transactions/account/{id}` | JWT | Get transactions for specific account |
 
-### Transactions
+### Digital Twin (`/api/simulate/`)
 
-- `GET /transactions/` (Aggregates where `account_id` OR `to_account` align with user)
-- `POST /transactions/` (Forces sender to match logged-in user, triggers Transfer validations safely)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/simulate/` | JWT | Run what-if simulation |
+| `GET` | `/simulate/history/{id}` | JWT | Get simulation history |
+| `DELETE` | `/simulate/history/{id}` | JWT | Clear simulation history |
 
-### Risk & Status
+### Risk Analysis (`/api/risk/`)
 
-- `GET /risk/notifications/{id}` (Generates smart alerts evaluating cross-service user data)
-- `POST /simulate` (Safely spins up Twin metrics analyzing virtual balance projections)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/risk/analyze` | JWT | Run risk analysis |
+| `GET` | `/risk/score/{id}` | JWT | Get current risk score |
+| `GET` | `/risk/notifications/{id}` | JWT | Get smart risk alerts |
 
-### Portfolio & Notification
+### Portfolio & Notifications
 
-- `GET /portfolio/` (Aggregates accounts and balances securely to summarize wealth)
-- `GET /notifications/` (Retrieves user-specific system alerts contextually)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/portfolio/` | JWT | Aggregated wealth summary |
+| `GET` | `/notifications/` | JWT | User-specific system alerts |
+
+## 🎯 Key Features
+
+- **Google OAuth Login** — No passwords, instant sign-in
+- **2-Step Onboarding** — Personal info + initial deposit to get started fast
+- **Financial Persona Score** — AI-driven 0-100 score with persona label (e.g. "Balanced Builder", "Steady Saver") and personalized tips
+- **Digital Twin Simulation** — Test financial scenarios without touching real data
+- **Real-Time Risk Scoring** — Continuous 0-100 risk assessment with flagged events
+- **Cross-Account Transfers** — Copy account ID and send money to any user
+- **Dark/Light Theme** — Fully themed UI with CSS custom properties
+- **FinBot AI Assistant** — Built-in chatbot explaining platform features
+- **Protected Routing** — Auth + profile completion guards on all dashboard pages
