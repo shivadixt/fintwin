@@ -4,29 +4,94 @@ import client from '../api/client';
 import RiskBar from '../components/RiskBar';
 import { showToast } from '../components/Toast';
 
+const SCENARIO_CONFIG = {
+  large_withdrawal: {
+    label: 'How much do you want to withdraw? (₹)',
+    helper: (amt) => amt ? `We'll simulate removing ₹${formatIndian(amt)} from your virtual balance` : 'Enter a withdrawal amount to simulate',
+    isDeduction: true,
+    selectLabel: 'Large Withdrawal',
+  },
+  deposit: {
+    label: 'How much do you want to deposit? (₹)',
+    helper: (amt) => amt ? `We'll simulate adding ₹${formatIndian(amt)} to your virtual balance` : 'Enter a deposit amount to simulate',
+    isDeduction: false,
+    selectLabel: 'Large Deposit',
+  },
+  rate_change: {
+    label: 'New interest rate to simulate (%)',
+    helper: (amt) => amt ? `We'll apply a ${amt}% rate change to project your balance` : 'Enter an interest rate percentage',
+    isDeduction: false,
+    selectLabel: 'Interest Rate Change',
+  },
+  recurring_expense: {
+    label: 'Monthly expense amount (₹)',
+    helper: (amt) => amt ? `We'll simulate a recurring ₹${formatIndian(amt)}/month expense impact` : 'Enter a monthly expense amount',
+    isDeduction: true,
+    selectLabel: 'Recurring Expense',
+  },
+  investment_growth: {
+    label: 'Amount to invest (₹)',
+    helper: (amt) => amt ? `We'll simulate investing ₹${formatIndian(amt)} and project returns` : 'Enter an investment amount',
+    isDeduction: true,
+    selectLabel: 'Investment Growth',
+  },
+  emergency_fund: {
+    label: 'Emergency withdrawal amount (₹)',
+    helper: (amt) => amt ? `We'll simulate an emergency withdrawal of ₹${formatIndian(amt)}` : 'Enter the emergency withdrawal amount',
+    isDeduction: true,
+    selectLabel: 'Emergency Fund',
+  },
+};
+
+function formatIndian(num) {
+  const n = parseFloat(num);
+  if (isNaN(n)) return '0';
+  return n.toLocaleString('en-IN');
+}
+
 export default function DigitalTwin() {
   const { user } = useAuth();
-  const [accounts, setAccounts] = useState([]);
-  const [accountId, setAccountId] = useState('');
-  const [scenario, setScenario] = useState('withdrawal');
+  const [balance, setBalance] = useState(null);
+  const [balanceLoading, setBalanceLoading] = useState(true);
+  const [balanceError, setBalanceError] = useState(false);
+  const [scenario, setScenario] = useState('large_withdrawal');
   const [amount, setAmount] = useState('');
+  const [amountError, setAmountError] = useState('');
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [history, setHistory] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchAccounts = async () => {
-      try {
-        const res = await client.get('/accounts/');
-        setAccounts(res.data);
-        if (res.data.length > 0) setAccountId(res.data[0].id);
-      } catch (err) {
-        console.error(err);
+  // Auto-fetch balance from transactions
+  const fetchBalance = async () => {
+    if (!user?.id) return;
+    setBalanceLoading(true);
+    setBalanceError(false);
+    try {
+      const res = await client.get(`/transactions/account/${user.id}`);
+      const txns = res.data || [];
+      let computed = 0;
+      for (const txn of txns) {
+        if (txn.type === 'deposit') {
+          computed += txn.amount;
+        } else if (txn.type === 'withdrawal') {
+          computed -= txn.amount;
+        } else if (txn.type === 'transfer') {
+          if (txn.to_account === user.id) {
+            computed += txn.amount;
+          } else {
+            computed -= txn.amount;
+          }
+        }
       }
-    };
-    fetchAccounts();
-  }, []);
+      setBalance(computed);
+    } catch {
+      setBalanceError(true);
+      setBalance(0);
+    } finally {
+      setBalanceLoading(false);
+    }
+  };
 
   const fetchHistory = async () => {
     if (!user?.id) return;
@@ -40,21 +105,55 @@ export default function DigitalTwin() {
     }
   };
 
-  useEffect(() => { fetchHistory(); }, [user]);
+  useEffect(() => {
+    fetchBalance();
+    fetchHistory();
+  }, [user]);
+
+  const config = SCENARIO_CONFIG[scenario] || SCENARIO_CONFIG.large_withdrawal;
+
+  // Validate amount against balance for deduction scenarios
+  const validateAmount = (val) => {
+    const num = parseFloat(val);
+    if (!val || isNaN(num) || num <= 0) {
+      setAmountError('');
+      return;
+    }
+    if (config.isDeduction && balance !== null && num > balance) {
+      setAmountError(`Amount exceeds your balance of ₹${formatIndian(balance)}`);
+    } else {
+      setAmountError('');
+    }
+  };
+
+  const handleAmountChange = (e) => {
+    const val = e.target.value;
+    setAmount(val);
+    validateAmount(val);
+  };
+
+  // Re-validate when scenario changes
+  useEffect(() => {
+    validateAmount(amount);
+  }, [scenario]);
 
   const handleSimulate = async (e) => {
     e.preventDefault();
+    if (amountError) return;
     setLoading(true);
     setResult(null);
     try {
+      // Map new scenario names to what the backend expects
+      const backendScenario = scenario === 'large_withdrawal' ? 'withdrawal' : scenario;
       const res = await client.post('/simulate/', {
-        account_id: accountId,
-        scenario,
+        account_id: user?.id || 'user',
+        scenario: backendScenario,
         amount: parseFloat(amount),
+        balance: balance ?? 0,
       });
       setResult(res.data);
       showToast('Simulation complete');
-      fetchHistory(); // Refresh history after simulation
+      fetchHistory();
     } catch (err) {
       showToast(err.response?.data?.detail || 'Simulation failed');
     } finally {
@@ -84,15 +183,7 @@ export default function DigitalTwin() {
     }
   };
 
-  const formatCurrency = (v) => `₹${v.toLocaleString('en-IN')}`;
-  const selectedAccount = accounts.find(a => a.id === accountId);
-  const amountLabel = scenario === 'rate_change' ? 'Rate Change (%)' : 'Amount (₹)';
-
-  const scenarioLabels = {
-    withdrawal: 'Large Withdrawal',
-    deposit: 'Large Deposit',
-    rate_change: 'Interest Rate Change',
-  };
+  const formatCurrency = (v) => `₹${parseFloat(v).toLocaleString('en-IN')}`;
 
   const formatTime = (ts) => {
     if (!ts) return '—';
@@ -111,37 +202,78 @@ export default function DigitalTwin() {
           <div className="card-header">
             <span className="card-title">Configure Simulation</span>
           </div>
-          <form onSubmit={handleSimulate}>
-            <div className="form-group">
-              <label className="form-label">Account</label>
-              <select className="form-select" value={accountId} onChange={e => setAccountId(e.target.value)}>
-                {accounts.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.name} — {formatCurrency(a.balance)}
-                  </option>
-                ))}
-              </select>
+
+          {/* Auto-fetched Balance Display */}
+          {balanceLoading ? (
+            <div style={{
+              padding: '20px',
+              background: 'var(--surface2)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: 16,
+            }}>
+              <div style={{ width: 120, height: 12, background: 'var(--border)', borderRadius: 4, marginBottom: 10, animation: 'pulse 1.5s infinite' }} />
+              <div style={{ width: 180, height: 24, background: 'var(--border)', borderRadius: 4, animation: 'pulse 1.5s infinite' }} />
             </div>
+          ) : balanceError ? (
+            <div style={{
+              padding: '16px 20px',
+              background: 'var(--red-bg)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: 16,
+              fontSize: 13,
+              color: 'var(--red)',
+            }}>
+              ⚠️ Could not load balance. Please refresh.
+            </div>
+          ) : (
+            <div style={{
+              padding: '16px 20px',
+              background: 'linear-gradient(135deg, var(--surface2), var(--surface))',
+              border: '1px solid var(--green)',
+              borderRadius: 'var(--radius-sm)',
+              marginBottom: 16,
+            }}>
+              <div style={{ fontSize: 12, color: 'var(--text3)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 6 }}>
+                💰 Your Current Balance
+              </div>
+              <div style={{ fontSize: 26, fontWeight: 800, color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>
+                ₹{formatIndian(balance)}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                Used automatically in simulation
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSimulate}>
             <div className="form-group">
               <label className="form-label">Scenario</label>
               <select className="form-select" value={scenario} onChange={e => setScenario(e.target.value)}>
-                <option value="withdrawal">Large Withdrawal</option>
-                <option value="deposit">Large Deposit</option>
-                <option value="rate_change">Interest Rate Change</option>
+                {Object.entries(SCENARIO_CONFIG).map(([key, cfg]) => (
+                  <option key={key} value={key}>{cfg.selectLabel}</option>
+                ))}
               </select>
             </div>
+
             <div className="form-group">
-              <label className="form-label">{amountLabel}</label>
+              <label className="form-label">{config.label}</label>
               <input
-                className="form-input"
+                className={`form-input ${amountError ? 'input-error' : ''}`}
                 type="number"
                 value={amount}
-                onChange={e => setAmount(e.target.value)}
-                placeholder="0"
+                onChange={handleAmountChange}
+                placeholder="Enter amount..."
                 required
+                min="0"
+                step="any"
               />
+              {amountError && <span className="field-error">{amountError}</span>}
+              <div style={{ marginTop: 6, fontSize: 12, color: 'var(--text3)', fontStyle: 'italic' }}>
+                {config.helper(amount)}
+              </div>
             </div>
-            <button className="btn btn-blue btn-full" type="submit" disabled={loading}>
+
+            <button className="btn btn-blue btn-full" type="submit" disabled={loading || !!amountError || balanceLoading}>
               {loading ? 'Running…' : 'Run Simulation'}
             </button>
           </form>
