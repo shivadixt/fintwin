@@ -1,0 +1,36 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/auth/:path*",
+      "destination": "https://fintwin-account.onrender.com/auth/:path*"
+    },
+    {
+      "source": "/api/accounts/:path*",
+      "destination": "https://fintwin-account.onrender.com/accounts/:path*"
+    },
+    {
+      "source": "/api/transactions/:path*",
+      "destination": "https://fintwin-transaction.onrender.com/transactions/:path*"
+    },
+    {
+      "source": "/api/simulate/:path*",
+      "destination": "https://fintwin-twin.onrender.com/simulate/:path*"
+    },
+    {
+      "source": "/api/risk/:path*",
+      "destination": "https://fintwin-risk.onrender.com/risk/:path*"
+    },
+    {
+      "source": "/api/portfolio/:path*",
+      "destination": "https://fintwin-portfolio.onrender.com/portfolio/:path*"
+    },
+    {
+      "source": "/api/notifications/:path*",
+      "destination": "https://fintwin-notification.onrender.com/notifications/:path*"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
