@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import Account
-from schemas import AccountOut, BalanceUpdate
+from schemas import AccountOut, BalanceUpdate, AccountCreate
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -46,7 +46,38 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 @router.get("/", response_model=list[AccountOut])
 def list_accounts(db: Session = Depends(get_db), current_user: Account = Depends(get_current_user)):
-    return db.query(Account).filter(Account.id == current_user.id).all()
+    from sqlalchemy import or_
+    return db.query(Account).filter(
+        or_(Account.id == current_user.id, Account.email == current_user.email, Account.email.like(f"acc-%@fintwin.local"))
+    ).all()
+
+
+@router.post("/", response_model=AccountOut)
+def create_account(req: AccountCreate, db: Session = Depends(get_db), current_user: Account = Depends(get_current_user)):
+    """Create a new sub-account for the authenticated user."""
+    import string, random
+    chars = string.ascii_uppercase + string.digits
+    new_id = "ACC-" + "".join(random.choices(chars, k=6))
+    account = Account(
+        id=new_id,
+        name=req.name,
+        email=current_user.email,
+        picture=current_user.picture,
+        type=req.type,
+        balance=req.balance,
+    )
+    try:
+        db.add(account)
+        db.commit()
+        db.refresh(account)
+    except Exception:
+        db.rollback()
+        # Email unique constraint — use a generated email
+        account.email = f"{new_id.lower()}@fintwin.local"
+        db.add(account)
+        db.commit()
+        db.refresh(account)
+    return account
 
 
 @router.get("/{account_id}/exists")

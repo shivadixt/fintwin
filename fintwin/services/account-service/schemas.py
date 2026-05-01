@@ -21,5 +21,11 @@ class SessionResponse(BaseModel):
     user: dict
 
 
+class AccountCreate(BaseModel):
+    name: str
+    type: str = "savings"
+    balance: float = 0.0
+
+
 class BalanceUpdate(BaseModel):
     delta: float

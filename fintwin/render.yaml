@@ -1,0 +1,126 @@
+services:
+  # ── Account Service (Auth + User Management) ──
+  - type: web
+    name: fintwin-account
+    runtime: docker
+    dockerfilePath: ./services/account-service/Dockerfile
+    dockerContext: ./services/account-service
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: INTERNAL_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: SESSION_TTL
+        value: "86400"
+
+  # ── Transaction Service ──
+  - type: web
+    name: fintwin-transaction
+    runtime: docker
+    dockerfilePath: ./services/transaction-service/Dockerfile
+    dockerContext: ./services/transaction-service
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: INTERNAL_KEY
+        sync: false
+      - key: ACCOUNT_SERVICE_URL
+        sync: false
+      - key: NOTIFICATION_SERVICE_URL
+        sync: false
+
+  # ── Twin Service (AI Financial Planner) ──
+  - type: web
+    name: fintwin-twin
+    runtime: docker
+    dockerfilePath: ./services/twin-service/Dockerfile
+    dockerContext: ./services/twin-service
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: INTERNAL_KEY
+        sync: false
+      - key: ACCOUNT_SERVICE_URL
+        sync: false
+      - key: NOTIFICATION_SERVICE_URL
+        sync: false
+      - key: PORTFOLIO_SERVICE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # ── Risk Service (ML + Deep Analysis) ──
+  - type: web
+    name: fintwin-risk
+    runtime: docker
+    dockerfilePath: ./services/risk-service/Dockerfile
+    dockerContext: ./services/risk-service
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: INTERNAL_KEY
+        sync: false
+      - key: ACCOUNT_SERVICE_URL
+        sync: false
+      - key: TRANSACTION_SERVICE_URL
+        sync: false
+      - key: NOTIFICATION_SERVICE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # ── Portfolio Service ──
+  - type: web
+    name: fintwin-portfolio
+    runtime: docker
+    dockerfilePath: ./services/portfolio-service/Dockerfile
+    dockerContext: ./services/portfolio-service
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: INTERNAL_KEY
+        sync: false
+
+  # ── Notification Service ──
+  - type: web
+    name: fintwin-notification
+    runtime: docker
+    dockerfilePath: ./services/notification-service/Dockerfile
+    dockerContext: ./services/notification-service
+    plan: free
+    healthCheckPath: /
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: INTERNAL_KEY
+        sync: false

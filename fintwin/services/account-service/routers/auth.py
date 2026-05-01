@@ -19,6 +19,7 @@ GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost/api/auth/google/callback")
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379")
 SESSION_TTL = int(os.getenv("SESSION_TTL", "86400"))  # 24h default
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
 
 # Redis connection
 try:
@@ -124,8 +125,8 @@ def google_callback(code: str, db: Session = Depends(get_db)):
     session_token = store_session(account.id, account.name, account.email, account.picture)
 
     # Redirect frontend with token as query param (frontend stores in sessionStorage)
-    frontend_url = f"http://localhost:3000/auth/callback?token={session_token}&name={account.name}&id={account.id}&email={account.email}"
-    return RedirectResponse(url=frontend_url)
+    callback_url = f"{FRONTEND_URL}/?token={session_token}&name={account.name}&id={account.id}&email={account.email}"
+    return RedirectResponse(url=callback_url)
 
 
 @router.post("/logout")
