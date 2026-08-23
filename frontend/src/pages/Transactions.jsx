@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import client from '../api/client';
 import { showToast } from '../components/Toast';
 
 export default function Transactions() {
-  const [accounts, setAccounts] = useState([]);
+  const { user } = useAuth();
   const [transactions, setTransactions] = useState([]);
-  const [accountId, setAccountId] = useState('');
   const [type, setType] = useState('deposit');
   const [amount, setAmount] = useState('');
   const [toAccount, setToAccount] = useState('');
@@ -17,17 +17,10 @@ export default function Transactions() {
 
   const fetchData = async () => {
     try {
-      const [accRes, txnRes] = await Promise.all([
-        client.get('/accounts/'),
-        client.get(`/transactions/?limit=${PAGE_SIZE}&offset=0`),
-      ]);
-      setAccounts(accRes.data);
+      const txnRes = await client.get(`/transactions/?limit=${PAGE_SIZE}&offset=0`);
       const txns = txnRes.data;
       setTransactions(txns);
       setHasMore(txns.length >= PAGE_SIZE);
-      if (accRes.data.length > 0 && !accountId) {
-        setAccountId(accRes.data[0].id);
-      }
     } catch (err) {
       console.error(err);
     }
@@ -54,7 +47,7 @@ export default function Transactions() {
     setLoading(true);
     try {
       const payload = {
-        account_id: accountId,
+        account_id: user?.id || '',
         type,
         amount: parseFloat(amount),
         note: note || null,
@@ -64,6 +57,7 @@ export default function Transactions() {
       showToast('Transaction recorded');
       setAmount('');
       setNote('');
+      setToAccount('');
       fetchData();
     } catch (err) {
       showToast(err.response?.data?.detail || 'Transaction failed');
@@ -90,14 +84,6 @@ export default function Transactions() {
             <span className="card-title">New Transaction</span>
           </div>
           <form onSubmit={handleSubmit}>
-            <div className="form-group">
-              <label className="form-label">Account</label>
-              <select className="form-select" value={accountId} onChange={e => setAccountId(e.target.value)}>
-                {accounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.name} ({a.id})</option>
-                ))}
-              </select>
-            </div>
             <div className="form-group">
               <label className="form-label">Type</label>
               <select className="form-select" value={type} onChange={e => setType(e.target.value)}>
@@ -135,20 +121,25 @@ export default function Transactions() {
               <div style={{ color: 'var(--text3)', fontSize: 13, padding: 12 }}>No transactions yet</div>
             )}
             {transactions.map(txn => {
-              const isReceiver = txn.type === 'transfer' && accounts.some(a => a.id === txn.to_account) && !accounts.some(a => a.id === txn.account_id);
-              const isIncoming = txn.type === 'deposit' || isReceiver;
+              const isIncoming = txn.type === 'deposit' || (txn.type === 'transfer' && txn.to_account === user?.id);
+              const txnLabel = txn.type === 'transfer' ? (isIncoming ? 'Received' : 'Sent') : txn.type;
+              const iconBg = isIncoming ? 'green-bg' : txn.type === 'withdrawal' ? 'red-bg' : 'blue-bg';
+              const icon = isIncoming ? '↓' : txn.type === 'withdrawal' ? '↑' : '↑';
+              const subText = txn.type === 'transfer'
+                ? (isIncoming ? `From ${txn.account_id.slice(0, 8)}…` : `To ${txn.to_account?.slice(0, 8)}…`)
+                : (txn.note || txn.id.slice(0, 8));
               
               return (
               <div className="list-item" key={txn.id}>
                 <div className="list-item-left">
-                  <div className={`list-item-icon ${txn.type === 'deposit' ? 'green-bg' : txn.type === 'withdrawal' ? 'red-bg' : isIncoming ? 'green-bg' : 'blue-bg'}`}>
-                    {txn.type === 'deposit' || isReceiver ? '↓' : txn.type === 'withdrawal' ? '↑' : '⇄'}
+                  <div className={`list-item-icon ${iconBg}`}>
+                    {icon}
                   </div>
                   <div>
                     <div className="list-item-title" style={{ textTransform: 'capitalize' }}>
-                      {txn.type} {isReceiver && '(Received)'}
+                      {txnLabel}
                     </div>
-                    <div className="list-item-sub">{txn.account_id}{txn.to_account ? ` → ${txn.to_account}` : ''}</div>
+                    <div className="list-item-sub">{subText}</div>
                   </div>
                 </div>
                 <div style={{ textAlign: 'right' }}>

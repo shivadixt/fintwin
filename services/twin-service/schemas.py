@@ -6,6 +6,7 @@ class SimulationRequest(BaseModel):
     account_id: str
     scenario: str  # withdrawal, deposit, rate_change
     amount: float
+    balance: Optional[float] = 0.0
 
 
 class SimulationResult(BaseModel):

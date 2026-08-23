@@ -14,7 +14,6 @@ from scoring import compute_risk_score
 
 router = APIRouter(prefix="/risk", tags=["risk"])
 
-ACCOUNT_SERVICE_URL = os.getenv("ACCOUNT_SERVICE_URL", "http://account-service:8001")
 NOTIFICATION_SERVICE_URL = os.getenv("NOTIFICATION_SERVICE_URL", "http://notification-service:8006")
 INTERNAL_KEY = os.getenv("INTERNAL_KEY", "fintwin-internal-2024")
 
@@ -76,6 +75,7 @@ async def analyze_risk(req: RiskAnalyzeRequest, db: Session = Depends(get_db), c
             score=existing.score,
             alert_level=result["alert_level"],
             flags=result["flags"],
+            ml_details=result.get("ml_details"),
             updated_at=existing.updated_at,
         )
     else:
@@ -94,6 +94,7 @@ async def analyze_risk(req: RiskAnalyzeRequest, db: Session = Depends(get_db), c
             score=risk_record.score,
             alert_level=result["alert_level"],
             flags=result["flags"],
+            ml_details=result.get("ml_details"),
             updated_at=risk_record.updated_at,
         )
 
@@ -179,27 +180,16 @@ async def get_notifications(
         elif record.score > 30 and record.score <= 60:
             notifications.append({"message": "Moderate risk detected — review your recent transactions", "type": "Risk"})
 
-    # 2. Check transactions and balance
+    # 2. Check transactions
     auth_header = request.headers.get("Authorization")
     headers = {"Authorization": auth_header} if auth_header else {}
     
     TRANSACTION_SERVICE_URL = os.getenv("TRANSACTION_SERVICE_URL", "http://transaction-service:8002")
     
     async with httpx.AsyncClient() as client:
-        balance = 0
-        acc_resp = await client.get(f"{ACCOUNT_SERVICE_URL}/accounts/{account_id}", headers=headers)
-        if acc_resp.status_code == 200:
-            balance = acc_resp.json().get("balance", 0)
-
         txn_resp = await client.get(f"{TRANSACTION_SERVICE_URL}/transactions/account/{account_id}", headers=headers)
         if txn_resp.status_code == 200:
             transactions = txn_resp.json()
-            
-            # Check for large transactions (> 50% of balance)
-            if balance > 0:
-                has_large_txn = any(abs(t.get("amount", 0)) > balance * 0.5 for t in transactions)
-                if has_large_txn:
-                    notifications.append({"message": "Large transaction detected on your account", "type": "Alert"})
             
             # Check for 3+ transactions today
             today_str = datetime.utcnow().date().isoformat()

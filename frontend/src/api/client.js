@@ -6,7 +6,7 @@ const client = axios.create({
 
 // Request interceptor — attach JWT token
 client.interceptors.request.use((config) => {
-  const token = sessionStorage.getItem('ft_token');
+  const token = localStorage.getItem('ft_token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -18,8 +18,8 @@ client.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      sessionStorage.clear();
-      window.location.reload();
+      localStorage.removeItem('ft_token');
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
